@@ -1,45 +1,56 @@
 const std = @import("std");
+const mem = std.mem;
 const assert = std.debug.assert;
 
-pub const BitArray = struct {
-    // TODO make size configurable
-    array: u128 = 0,
+pub fn BitArray(size: usize) type {
+    assert(size % 64 == 0);
 
-    const size = @bitSizeOf(array);
+    return struct {
+        array: [size / 64]u64 = [_]u64{0} ** (size / 64),
 
-    pub fn get(self: BitArray, idx: u7) bool {
-        return ((@as(@TypeOf(self.array), 1) << idx) & self.array) != 0;
-    }
+        const Self = @This();
+        const MAX_U64 = std.math.maxInt(u64);
 
-    pub fn set(self: *BitArray, idx: u7) void {
-        self.array |= @as(@TypeOf(self.array), 1) << idx;
-    }
+        pub fn get(self: Self, idx: usize) bool {
+            assert(idx < size);
 
-    pub fn unset(self: *BitArray, idx: u7) void {
-        self.array &= std.math.maxInt(@TypeOf(self.array)) ^ @as(@TypeOf(self.array), 1) << idx;
-    }
-
-    // returns new value
-    pub fn toggle(self: *BitArray, idx: u7) bool {
-        if (self.get(idx)) {
-            self.unset(idx);
-            return false;
+            return ((@as(u64, 1) << @truncate(u6, idx)) & self.array[idx / 64]) != 0;
         }
-        self.set(idx);
-        return true;
-    }
 
-    pub fn clear(self: *BitArray) void {
-        self.array = 0;
-    }
-};
+        pub fn set(self: *Self, idx: usize) void {
+            assert(idx < size);
+
+            self.array[idx / 64] |= @as(u64, 1) << @truncate(u6, idx);
+        }
+
+        pub fn unset(self: *Self, idx: usize) void {
+            assert(idx < size);
+
+            self.array[idx / 64] &= MAX_U64 ^ @as(u64, 1) << @truncate(u6, idx);
+        }
+
+        // returns new value
+        pub fn toggle(self: *Self, idx: usize) bool {
+            if (self.get(idx)) {
+                self.unset(idx);
+                return false;
+            }
+            self.set(idx);
+            return true;
+        }
+
+        pub fn clear(self: *Self) void {
+            self.array = [_]u64{0} ** (size / 64);
+        }
+    };
+}
 
 const testing = std.testing;
 const log = std.log;
 const expect = std.testing.expect;
 
 test "bit array" {
-    var arr = BitArray{};
+    var arr = BitArray(64){};
 
     expect(!arr.get(5));
 
@@ -60,9 +71,9 @@ test "bit array" {
 }
 
 test "fill bit array" {
-    var arr = BitArray{};
+    var arr = BitArray(128){};
 
-    var idx: u7 = 0;
+    var idx: usize = 0;
     while (idx < 127) : (idx += 1) {
         arr.set(idx);
         expect(arr.get(idx));
